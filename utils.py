@@ -182,7 +182,7 @@ def get_gemma_2_2b_sae_ids(layer, layer_type="res"):
 
 def get_llama_3_1_8b_sae_ids(layer, layer_type="res"):
     assert layer_type == "res"
-    return [f"l{layer}r_32x"]
+    return [f"l{layer}r_8x", f"l{layer}r_32x"]
 
 def layer_to_sae_ids(layer, model_name, layer_type="res"):
     if model_name == "gemma_2_2b":
@@ -227,8 +227,26 @@ def gemma_sae_info_to_params(sae_id):
         "layer": layer,
         "width": width,
         "width_str": width_str,
-        "average_l0": average_l0
+        "l0": average_l0
     }
+
+def llama_sae_info_to_params(sae_id):
+    layer, width_str = sae_id.split("_")
+    layer = int(layer.split("l")[-1][:-1])
+    width = 4096 * int(width_str.split("x")[0])
+    return {
+        "layer": layer,
+        "width": width,
+        "width_str": width_str,
+        "l0": 50
+    }
+def sae_info_to_params(sae_id, model_name):
+    if model_name == "gemma_2_2b":
+        return gemma_sae_info_to_params(sae_id)
+    elif model_name == "gemma_2_9b":
+        return gemma_sae_info_to_params(sae_id)
+    elif model_name == "llama_3.1_8b":
+        return llama_sae_info_to_params(sae_id)
 
 # %%
 
