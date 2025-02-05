@@ -1,7 +1,11 @@
+# %%
+
 import torch
 import numpy as np
 import os
 import dill as pickle
+from sae_lens.toolkit.pretrained_saes_directory import get_pretrained_saes_directory
+from sae_lens.sae import SAE
 
 
 try:
@@ -163,26 +167,70 @@ class SAEInfoObject:
         return feature_frequencies, average_feature_values_when_active, average_feature_values_overall
 
 
-def get_gemma_sae_params_for_layer(layer, model="gemma_2_2b", layer_type="res"):
-    if model == "gemma_2_2b":
-        all_saes = pickle.load(open(f"gemma_sae_pickles/gemma_sae_dict_2b_{layer_type}.pkl", "rb"))
-    elif model == "gemma_2_9b":
-        all_saes = pickle.load(open(f"gemma_sae_pickles/gemma_sae_dict_9b_{layer_type}.pkl", "rb"))
+
+def get_gemma_2_9b_sae_ids(layer, layer_type="res"):
+    assert layer_type in ["res", "att", "mlp"]
+    all_gemma_scope_saes = get_pretrained_saes_directory()[f"gemma-scope-9b-pt-{layer_type}"].saes_map
+    all_sae_ids = [sae_id for sae_id in all_gemma_scope_saes if sae_id.split("/")[0] == f"layer_{layer}"]
+    return all_sae_ids
+
+def get_gemma_2_2b_sae_ids(layer, layer_type="res"):
+    assert layer_type in ["res", "att", "mlp"]
+    all_gemma_scope_saes = get_pretrained_saes_directory()[f"gemma-scope-2b-pt-{layer_type}"].saes_map
+    all_sae_ids = [sae_id for sae_id in all_gemma_scope_saes if sae_id.split("/")[0] == f"layer_{layer}"]
+    return all_sae_ids
+
+def get_llama_3_1_8b_sae_ids(layer, layer_type="res"):
+    assert layer_type == "res"
+    return [f"l{layer}r_32x"]
+
+def layer_to_sae_ids(layer, model_name, layer_type="res"):
+    if model_name == "gemma_2_2b":
+        return get_gemma_2_2b_sae_ids(layer, layer_type)
+    elif model_name == "gemma_2_9b":
+        return get_gemma_2_9b_sae_ids(layer, layer_type)
+    elif model_name == "llama_3.1_8b":
+        return get_llama_3_1_8b_sae_ids(layer, layer_type)
     else:
-        raise ValueError(f"Model {model} not known")
+        raise ValueError(f"Invalid model name: {model_name}")
 
-    result_dict = {}
-    for width, l0 in all_saes[layer]:
-        if width not in result_dict:
-            result_dict[width] = []
-        result_dict[width].append(l0)
-    return result_dict
+def load_sae(sae_id, model_name, layer_type="res"):
+    if model_name == "gemma_2_2b":
+        sae = SAE.from_pretrained(
+            release = f"gemma-scope-2b-pt-{layer_type}",
+            sae_id = sae_id,
+            device = "cpu",
+        )[0]
+    elif model_name == "gemma_2_9b":
+        sae = SAE.from_pretrained(
+            release = f"gemma-scope-9b-pt-{layer_type}",
+            sae_id = sae_id,
+            device = "cpu",
+        )[0]
+    elif model_name == "llama_3.1_8b":
+        assert layer_type == "res"
+        width = sae_id.split("_")[-1]
+        sae = SAE.from_pretrained(
+            release = f"llama_scope_lxr_32x_{width}",
+            sae_id = sae_id,
+            device = "cpu",
+        )[0]
+    return sae
 
-def get_l0_closest_to(l0s, goal_l0):
-    return min(l0s, key=lambda x: abs(x - goal_l0))
+def gemma_sae_info_to_params(sae_id):
+    layer, width, average_l0 = sae_id.split("/")
+    layer = int(layer.split("_")[-1])
+    average_l0 = int(average_l0.split("_")[-1])
+    width_str = width.split("_")[-1]
+    width = {"16k": int(2**14), "32k": int(2**15), "65k": int(2**16), "131k": int(2**17), "262k": int(2**18), "524k": int(2**19), "1m": int(2**20)}[width_str]
+    return {
+        "layer": layer,
+        "width": width,
+        "width_str": width_str,
+        "average_l0": average_l0
+    }
 
-def get_gemma_sae_params_closest_to_l0_all_layers(l0):
-    pass
+# %%
 
 def get_sae_info(layer, sae_name, model="gemma_2_2b", num_cols_start=None, layer_type="res") -> SAEInfoObject:
     layer_type_extension_load_dir = f"_{layer_type}" if layer_type != "res" else ""

@@ -84,7 +84,7 @@ num_contexts = 300
 
 
 dataset_name = "monology/pile-uncopyrighted"
-save_dir_base = f"{BASE_DIR}/gemma_{size}_sae_scaling"
+save_dir_base = f"{BASE_DIR}/gemma_2_{size}_sae_scaling"
 if layer_type == "mlp":
     save_dir_base = os.path.join(save_dir_base + "_mlp")
 elif layer_type == "att":
