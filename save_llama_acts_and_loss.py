@@ -26,39 +26,20 @@ try:
 except:
     is_notebook = False
 
-if not is_notebook:
-    argparser = argparse.ArgumentParser()
-    argparser.add_argument("--device", type=str, default="cuda:0")
-    argparser.add_argument("--layers", type=int, nargs="+", default=None)
-    argparser.add_argument("--layer_type", choices=["res", "mlp", "att"], default="res")
-    argparser.add_argument("--size", choices=["2b", "9b"], default="9b")
+argparser = argparse.ArgumentParser()
+argparser.add_argument("--device", type=str, default="cuda:0")
 
-    args = argparser.parse_args()
+args = argparser.parse_args()
 
-    device = args.device
-    layers = args.layers
-    layer_type = args.layer_type
-    size = args.size
-    if layers is None:
-        if size == "2b":
-            layers = range(26)
-        elif size == "9b":
-            layers = range(41)
-        else:
-            raise ValueError(f"Unknown size {size}")
+device = args.device
+layers = range(32)
 
-else:
-
-    device = "cuda:0"
-    layers = range(41)
-    layer_type = "res"
-    size = "9b"
 
 # %%
 
-
+device = "cuda:0"
 model = transformer_lens.HookedTransformer.from_pretrained(
-    f"google/gemma-2-{size}",
+    f"meta-llama/Llama-3.1-8B",
     center_writing_weights=False,
     center_unembed=False,
     device=device,
@@ -66,15 +47,6 @@ model = transformer_lens.HookedTransformer.from_pretrained(
 
 
 # %%
-
-if layer_type == "mlp":
-    hook_names = [f"blocks.{layer}.hook_mlp_out" for layer in layers]
-elif layer_type == "att":
-    hook_names = [f"blocks.{layer}.attn.hook_z" for layer in layers]
-elif layer_type == "res":
-    hook_names = [f"blocks.{layer}.hook_resid_post" for layer in layers]
-else:
-    raise ValueError(f"Unknown layer type {layer_type}")
 
 ctx_len = 1024
 batch_size = 1
@@ -84,12 +56,11 @@ num_contexts = 300
 
 
 dataset_name = "monology/pile-uncopyrighted"
-save_dir_base = f"{BASE_DIR}/gemma_{size}_sae_scaling"
-if layer_type == "mlp":
-    save_dir_base = os.path.join(save_dir_base + "_mlp")
-elif layer_type == "att":
-    save_dir_base = os.path.join(save_dir_base + "_att")
+save_dir_base = f"{BASE_DIR}/llama_3.1_8b_sae_scaling"
 os.makedirs(save_dir_base, exist_ok=True)
+
+# %%
+hook_names = [f"blocks.{layer}.hook_resid_post" for layer in layers]
 
 # %%
 
@@ -151,8 +122,7 @@ def save_so_far():
 
     for layer, layer_acts in zip(layers, all_acts):
         layer_acts_cat = torch.cat(layer_acts, dim=0)
-        torch.save(layer_acts_cat, os.path.join(save_dir_base, f"acts_layer_{layer}_{layer_type}.pt"))
-        # layer_acts_cat.numpy().tofile(os.path.join(save_dir_base, f"acts_layer_{layer}.npy"))
+        torch.save(layer_acts_cat, os.path.join(save_dir_base, f"acts_layer_{layer}.pt"))
 
     for layer, layer_act_norms in zip(layers, all_act_norms):
         layer_act_norms_cat = torch.cat(layer_act_norms, dim=0)

@@ -16,7 +16,7 @@ try:
 except:
     is_notebook = False
 
-base_dirs_to_try = ["/mnt/sda1/jengels", "/media/jengels/sdb"]
+base_dirs_to_try = ["/mnt/sdb/jengels"]
 BASE_DIR = None
 for dir in base_dirs_to_try:
     if os.path.exists(dir):
