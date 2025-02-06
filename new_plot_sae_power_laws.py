@@ -119,7 +119,7 @@ def make_plots(model, layer, method="linear"):
     contour = axes[2].contourf(XI, YI, ZI, levels=15, cmap='viridis')
     cbar = plt.colorbar(contour, ax=axes[2])
     cbar.ax.tick_params(labelsize=6)
-    cbar.set_label(label=f"Nonlinear SAE {ylabel}", size=7, y=0.44)
+    # cbar.set_label(label=f"Nonlinear SAE {ylabel}", size=7, y=0.44)
     axes[2].scatter(x_contour, y_contour, c='black', s=1, alpha=0.7)
     axes[2].set_xlabel("SAE Width", fontsize=8)
     # axes[2].set_ylabel('SAE L0', fontsize=8)
@@ -128,11 +128,14 @@ def make_plots(model, layer, method="linear"):
     axes[2].set_xscale('log')
     axes[2].set_yscale('log')
 
+    axes[2].set_title(f"${ylabel}_{{nonlinear}}$", fontsize=8)
+
     # Second and third plots - R squared
     all_zs = [sae_error_norm_r_squareds, sae_error_vec_r_squareds]
     labels = ["norm", "vec"]
+    titles = ["$R^2$ predicting error norm", "$R^2$ predicting error vector"]
 
-    for i, (z_data, label) in enumerate(zip(all_zs, labels)):
+    for i, (z_data, label, title) in enumerate(zip(all_zs, labels, titles)):
         # i -= 1
         x_contour, y_contour, z_contour = create_contour_data(widths, saes, z_data)
         z_contour = z_contour[:, 0]
@@ -153,8 +156,9 @@ def make_plots(model, layer, method="linear"):
         axes[i].set_yscale('log')
         axes[i].set_xlim(x_min, x_max)
         axes[i].set_ylim(y_min, y_max)
-
-    plt.tight_layout()
+        axes[i].set_title(title, fontsize=8)
+        
+    plt.tight_layout(h_pad=0.5, w_pad=0.5)
     plt.savefig(f"plots/sae_power_law_contours_{model}_{layer}_combined.pdf", bbox_inches='tight', pad_inches=0.02)
     plt.show()
     plt.close()

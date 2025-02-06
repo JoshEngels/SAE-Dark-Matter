@@ -250,86 +250,42 @@ def sae_info_to_params(sae_id, model_name):
 
 # %%
 
-def get_sae_info(layer, sae_name, model="gemma_2_2b", num_cols_start=None, layer_type="res") -> SAEInfoObject:
+def get_sae_info(layer, sae_name, model, layer_type="res", num_cols_start=200) -> SAEInfoObject:
     layer_type_extension_load_dir = f"_{layer_type}" if layer_type != "res" else ""
-    if "gemma_2" in model:
-        model_size = model.split("_")[-1]
-        base_load_dir = f"{BASE_DIR}/gemma_{model_size}_sae_scaling{layer_type_extension_load_dir}"
-        if model_size == "2b":
-            model_dim = 2304
-        else:
-            model_dim = 3584
-        num_cols_end = 1023
-        if num_cols_start is None:
-            num_cols_start = 200
-    elif model == "llama":
-        base_load_dir = f"{BASE_DIR}/llama_8b_sae_scaling{layer_type_extension_load_dir}"
-        model_dim = 4096
-        num_cols_end = 2047
-        if num_cols_start is None:
-            num_cols_start = 200
-    elif model == "gpt2":
-        base_load_dir = f"{BASE_DIR}/gpt2_sae_scaling{layer_type_extension_load_dir}"
-        model_dim = 768
-        if num_cols_start is None:
-            num_cols_start = 10
-        num_cols_end = 511
-
+    base_load_dir = f"{BASE_DIR}/{model}_sae_scaling{layer_type_extension_load_dir}"
     load_dir = f"{base_load_dir}/{sae_name}"
 
-    l0s = torch.load(os.path.join(load_dir, f"sae_l0s_layer_{layer}.pt"))
+    l0s = torch.load(os.path.join(load_dir, f"sae_l0s_layer_{layer}_{layer_type}.pt"))
+    sae_error_vecs = torch.load(
+        f"{load_dir}/sae_error_vecs_layer_{layer}_{layer_type}.pt",
+    )
+    acts = torch.load(
+        f"{base_load_dir}/acts_layer_{layer}_{layer_type}.pt",
+    )
 
-    if layer_type != "att":
-        sae_error_vecs = torch.from_file(
-            f"{load_dir}/sae_error_vecs_layer_{layer}.npy",
-            shared=False,
-            size=l0s.numel() * model_dim,
-        )
-        sae_error_vecs = sae_error_vecs.view(l0s.shape[0], l0s.shape[1], model_dim)
 
-        acts = torch.from_file(
-            f"{base_load_dir}/acts_layer_{layer}.npy",
-            shared=False,
-            size=l0s.numel() * model_dim,
-        )
-        acts = acts.view(l0s.shape[0], l0s.shape[1], model_dim)
-    else:
-        assert model == "gemma_2_9b"
-        num_heads = 16
-        head_dim = 256
-        sae_error_vecs = torch.from_file(
-            f"{load_dir}/sae_error_vecs_layer_{layer}.npy",
-            shared=False,
-            size=l0s.numel() * num_heads * head_dim,
-        )
-        sae_error_vecs = sae_error_vecs.view(l0s.shape[0], l0s.shape[1], num_heads, head_dim)
-
-        acts = torch.from_file(
-            f"{base_load_dir}/acts_layer_{layer}.npy",
-            shared=False,
-            size=l0s.numel() * num_heads * head_dim,
-        )
-        acts = acts.view(l0s.shape[0], l0s.shape[1], num_heads, head_dim)
-
-    sae_error_norms = torch.load(os.path.join(load_dir, f"sae_errors_layer_{layer}.pt"))
+    sae_error_norms = torch.load(os.path.join(load_dir, f"sae_errors_layer_{layer}_{layer_type}.pt"))
     feature_act_norms = torch.load(
-        os.path.join(load_dir, f"feature_act_norms_layer_{layer}.pt")
+        os.path.join(load_dir, f"feature_act_norms_layer_{layer}_{layer_type}.pt")
     )
 
     model_losses = torch.load(os.path.join(base_load_dir, f"model_losses.pt"))
     tokens = torch.load(os.path.join(base_load_dir, f"tokens.pt"))
     act_norms = torch.load(os.path.join(base_load_dir, f"act_norms_layer_{layer}.pt"))
 
-    l0s = l0s[:, num_cols_start:num_cols_end]
-    sae_error_norms = sae_error_norms[:, num_cols_start:num_cols_end]
-    sae_error_vecs = sae_error_vecs[:, num_cols_start:num_cols_end]
-    feature_act_norms = feature_act_norms[:, num_cols_start:num_cols_end]
-    model_losses = model_losses[:, num_cols_start:num_cols_end]
-    tokens = tokens[:, num_cols_start:num_cols_end]
-    act_norms = act_norms[:, num_cols_start:num_cols_end]
+    # print(l0s.shape, sae_error_norms.shape, sae_error_vecs.shape, acts.shape, feature_act_norms.shape, model_losses.shape, tokens.shape, act_norms.shape)
 
-    print(acts.shape)
-    acts = acts[:, num_cols_start:num_cols_end, :]
+    l0s = l0s[:, num_cols_start:-1]
+    sae_error_norms = sae_error_norms[:, num_cols_start:-1]
+    sae_error_vecs = sae_error_vecs[:, num_cols_start:-1]
+    feature_act_norms = feature_act_norms[:, num_cols_start:-1]
+    tokens = tokens[:, num_cols_start:-1]
+    act_norms = act_norms[:, num_cols_start:-1]
+    acts = acts[:, num_cols_start:-1, :]
+
+    # Do not remove last token from model_losses, because it's one shorter than the others
+    num_cols_end = model_losses.shape[1]
+    model_losses = model_losses[:, num_cols_start:]
 
     model_loss_flattened = model_losses.flatten()
     sae_error_norms_flattened = sae_error_norms.flatten()
@@ -339,14 +295,13 @@ def get_sae_info(layer, sae_name, model="gemma_2_2b", num_cols_start=None, layer
 
     # Flatten first and second dim
     acts_flattened = acts.flatten(0, 1)
-    print(acts_flattened.shape)
     sae_error_vecs_flattened = sae_error_vecs.flatten(0, 1)
 
     ones = torch.ones_like(l0s_flattened)
     max_token = torch.max(tokens_flattened).item()
 
     active_sae_features = torch.load(
-        os.path.join(load_dir, f"active_sae_features_layer_{layer}.pt")
+        os.path.join(load_dir, f"active_sae_features_layer_{layer}_{layer_type}.pt")
     )
 
     return SAEInfoObject(
@@ -374,10 +329,6 @@ def get_all_tokens(model="gemma_2_2b"):
         base_load_dir = f"{BASE_DIR}/llama_8b_sae_scaling"
     return torch.load(f"{base_load_dir}/tokens.pt")
 
-
-def get_sae_info_by_params(layer, sae_width, sae_l0, model="gemma_2_2b", num_cols_start=200, layer_type="res"):
-    sae_name = f"layer_{layer}/width_{sae_width}/average_l0_{sae_l0}"
-    return get_sae_info(layer, sae_name, model, num_cols_start, layer_type)
 
 def normalized_mse(reconstruction, original_input):
     return (

@@ -76,10 +76,14 @@ for model_name, widths, layers in [("gemma_2_2b", ["16k", "65k"], range(26)), ("
 model_name_and_width_to_target_l0s = {
     ("llama_3.1_8b", "8x"): [50],
     ("llama_3.1_8b", "32x"): [50],
-    ("gemma_2_2b", "16k"): [20, 70, 160, 350],
-    ("gemma_2_2b", "65k"): [20, 70, 120, 250],
-    ("gemma_2_9b", "16k"): [10, 60, 120, 250],
-    ("gemma_2_9b", "131k"): [10, 60, 100, 250]
+    ("gemma_2_2b", "16k"): [50],
+    ("gemma_2_2b", "65k"): [50],
+    ("gemma_2_9b", "16k"): [50],
+    ("gemma_2_9b", "131k"): [50]
+    # ("gemma_2_2b", "16k"): [20, 70, 160, 350],
+    # ("gemma_2_2b", "65k"): [20, 70, 120, 250],
+    # ("gemma_2_9b", "16k"): [10, 60, 120, 250],
+    # ("gemma_2_9b", "131k"): [10, 60, 100, 250]
 }
 
 # %%
@@ -98,9 +102,12 @@ for model_name, widths, layers in [("llama_3.1_8b", ["8x", "32x"], range(50)), (
                 
 # %%
 
-with open("scripts/run_all.sh", "w") as f:
+all_commands = all_commands[::-1]
+
+with open("scripts/run_all_2.sh", "w") as f:
     for i in range(0, len(all_commands), num_gpus):
         for device_id in range(num_gpus):
             if i + device_id < len(all_commands):
                 f.write(f"{all_commands[i + device_id]} --device cuda:{device_id + gpu_offset} &\n")
         f.write("wait\n")
+# %%
