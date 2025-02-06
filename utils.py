@@ -211,7 +211,7 @@ def load_sae(sae_id, model_name, layer_type="res"):
         assert layer_type == "res"
         width = sae_id.split("_")[-1]
         sae = SAE.from_pretrained(
-            release = f"llama_scope_lxr_32x_{width}",
+            release = f"llama_scope_lxr_{width}",
             sae_id = sae_id,
             device = "cpu",
         )[0]
