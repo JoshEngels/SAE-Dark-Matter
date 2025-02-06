@@ -28,7 +28,7 @@ os.environ["OMP_NUM_THREADS"] = "10"
 
 device = "cuda:0"
 to_plot = "both"
-layer = 20
+layer = 31
 model = "gemma_2_9b"
 
 # %%
@@ -101,3 +101,5 @@ if not os.path.exists(save_file):
     with open(save_file, "wb") as f:
         pickle.dump(to_save, f)
 
+
+# %%

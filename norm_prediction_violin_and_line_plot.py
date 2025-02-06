@@ -11,6 +11,7 @@ from tqdm import tqdm
 from utils import BASE_DIR
 import argparse
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 os.environ['OMP_NUM_THREADS'] = '1'
 
@@ -88,9 +89,20 @@ for sae_id, model, layer in zip(all_sae_ids, all_models, all_layers):
 print(len(metadata_to_percents))
 
 # %%
-use_acts = False
+
+plt.rcParams.update({
+    'font.family': 'sans-serif',
+    'font.size': 6,
+    'axes.labelsize': 8,
+    'axes.titlesize': 8,
+    'xtick.labelsize': 7,
+    'ytick.labelsize': 7,
+    'legend.fontsize': 7,
+})
+
+use_acts = True
 # Create the plot
-fig, ax = plt.subplots(figsize=(4, 3.5))
+fig, ax = plt.subplots(figsize=(2.75, 2.5))
 
 legend_elements = []
 
@@ -103,7 +115,9 @@ norm_prediction_vals = [[] for _ in range(len(norm_prediction_names))]
 for metadata, percents in metadata_to_percents.items():
     for name in norm_prediction_names:
         if name in percents:
-            norm_prediction_vals[norm_prediction_names.index(name)].append(percents[name])
+            percent = percents[name]
+            if percent > 0.5:
+                norm_prediction_vals[norm_prediction_names.index(name)].append(percent)
 
 # Create violin plots
 parts = ax.violinplot(norm_prediction_vals, showmeans=False, showmedians=False, showextrema=False)
@@ -130,10 +144,10 @@ else:
     plt.ylim(-0.1, 1.03)
 
 # Customize the plot
-ax.set_ylabel('Norm Prediction Test $R^2$', fontsize=10)
+ax.set_ylabel('Norm Prediction Test $R^2$')
 ax.set_xticks(np.arange(1, len(norm_prediction_names) + 1))
-ax.tick_params(axis='both', which='major', labelsize=8)
-ax.set_xticklabels(norm_prediction_latex_names, rotation=45, ha='right', fontsize=9)
+ax.tick_params(axis='both', which='major')
+ax.set_xticklabels(norm_prediction_latex_names, rotation=45, ha='right')
 
 # Add legend
 # ax.legend(handles=legend_elements, loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=2, fontsize=8)
@@ -145,9 +159,19 @@ plt.savefig("plots/norm_prediction_test.pdf", bbox_inches='tight')
 plt.show()
 plt.close()
 # %%
-import matplotlib.pyplot as plt
-import os
-import torch
+
+
+
+plt.rcParams.update({
+    'font.family': 'sans-serif',
+    'font.size': 5,
+    'axes.labelsize': 7,
+    'axes.titlesize': 7,
+    'xtick.labelsize': 5.5,
+    'ytick.labelsize': 5.5,
+    'legend.fontsize': 6,
+})
+
 
 def get_sae_ids_closest_to_target_l0(model_name, layer_type, target_l0, layers, width):
     all_layer_sae_ids = []
@@ -162,8 +186,18 @@ def get_sae_ids_closest_to_target_l0(model_name, layer_type, target_l0, layers, 
         all_layer_sae_ids.append(closest_l0_sae_id)
     return all_layer_sae_ids
 
-plt.figure(figsize=(10,6))
+plt.figure(figsize=(2.75, 2))
 
+# colors = plt.cm.plasma(np.linspace(0, 1, 8))
+colors = plt.cm.tab10(np.linspace(0, 1, 10))
+colors_to_use = [
+    colors[0], 
+    colors[1], 
+    colors[2], 
+    colors[3], 
+    colors[4], 
+    colors[9]]
+color_id = 0
 for model_name, widths, layers in [("llama_3.1_8b", ["8x", "32x"], range(32)), ("gemma_2_2b", ["16k", "65k"], range(26)), ("gemma_2_9b", ["16k", "131k"], range(41))]:
     for width in widths:
         target_l0 = 50
@@ -177,17 +211,23 @@ for model_name, widths, layers in [("llama_3.1_8b", ["8x", "32x"], range(32)), (
             layer = params["layer"]
             print(sae_id, model_name, layer)
             if (sae_id, model_name, layer) in metadata_to_percents:
+                r2_value = metadata_to_percents[(sae_id, model_name, layer)]["SAE Error Vector"]
                 x_values.append(layer / len(layers))
-                r2_values.append(metadata_to_percents[(sae_id, model_name, layer)]["x"])
+                r2_values.append(max(0, r2_value))
 
         
         if len(x_values) > 0:
-            plt.plot(x_values, r2_values, label=f"{model_name} {width}", marker='o', alpha=0.7)
-
-plt.xlabel("Percent Through Model")
-plt.ylabel("R² Score for x")
-plt.title("R² Score vs Layer Depth")
-plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+            if width == "8x":
+                width = "32k"
+            elif width == "32x":
+                width = "131k"
+            plt.plot(x_values, r2_values, label=f"{model_name} {width}", marker='o', alpha=0.6, color=colors_to_use[color_id], markersize=4)
+            color_id += 1
+plt.xlabel("Layer by depth fraction in model")
+plt.ylabel("$R^2$ predicting error norm")
+# plt.title("R² Score vs Layer Depth")
+plt.legend()
+plt.ylim(0.4, 1.01)
 plt.grid(True, alpha=0.3)
 plt.tight_layout()
 plt.savefig("plots/r2_vs_depth.pdf", bbox_inches='tight')
